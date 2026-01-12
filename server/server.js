@@ -6,6 +6,7 @@ const cors = require('cors');
 const connectDB = require('./src/config/db'); // Import file kết nối DB
 const authRoutes = require('./src/routes/authRoutes'); // Import Routes API
 const socketAuthMiddleware = require('./src/middlewares/socketAuth'); // <--- [MỚI] Import Middleware bảo vệ Socket
+const chatSocket = require('./src/sockets/chatSocket'); // Import Socker Chat Handler
 require('dotenv').config(); 
 
 const app = express();
@@ -38,6 +39,9 @@ io.on("connection", (socket) => {
     // Lấy thông tin user từ biến socket.user (do middleware gắn vào)
     console.log(`✅ User đã kết nối: ${socket.user.userId}`);
     console.log(`   Socket ID: ${socket.id}`);
+
+    // Gọi hàm xử lý các sự kiện chat
+    chatSocket(io, socket);
 
     socket.on("disconnect", () => {
         console.log(`❌ User ${socket.user.userId} đã thoát.`);
