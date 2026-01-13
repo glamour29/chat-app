@@ -7,6 +7,7 @@ const connectDB = require('./src/config/db'); // Import file kết nối DB
 const authRoutes = require('./src/routes/authRoutes'); // Import Routes API
 const socketAuthMiddleware = require('./src/middlewares/socketAuth'); // <--- [MỚI] Import Middleware bảo vệ Socket
 const chatSocket = require('./src/sockets/chatSocket'); // Import Socker Chat Handler
+const messageRoutes = require('./src/routes/messageRoutes');
 require('dotenv').config(); 
 
 const app = express();
@@ -21,6 +22,9 @@ app.use(express.json());
 
 // 3. Khai báo Routes API
 app.use('/api/auth', authRoutes);
+
+// Route Lấy tin nhắn
+app.use('/api/messages', messageRoutes);
 
 // 4. Khởi tạo Socket.IO
 const io = new Server(server, {
