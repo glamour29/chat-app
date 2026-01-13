@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons // [MỚI]
 import androidx.compose.material.icons.filled.Add // [MỚI] Icon dấu +
@@ -33,12 +34,19 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     val messages by viewModel.messages.collectAsState()
     var textState by remember { mutableStateOf("") }
     val typingUser by viewModel.typingUser.collectAsState()
+    val listState = rememberLazyListState()
     val context = LocalContext.current // Lấy context để xử lý ảnh
 
     // Bộ chọn ảnh (Photo Picker)
     val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             viewModel.sendImage(context, uri)
+        }
+    }
+    LaunchedEffect(messages.size) {
+        // Index 0 là vị trí dưới cùng (do reverseLayout = true)
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
 
@@ -63,7 +71,8 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(16.dp), // Padding tổng thể cho list
-                reverseLayout = false // Đặt true nếu muốn tin nhắn mới nhất ở dưới cùng tự động đẩy lên
+                state = listState,
+                reverseLayout = false
             ) {
                 items(messages) { message ->
                     MessageBubble(
