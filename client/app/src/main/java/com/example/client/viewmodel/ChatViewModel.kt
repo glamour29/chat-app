@@ -52,8 +52,14 @@ class ChatViewModel : ViewModel() {
 
         // Lắng nghe sự kiện tin nhắn đã được xem
         repository.socket.on("message_seen_updated") { args ->
-            // Logic cập nhật trạng thái tin nhắn trong list messages thành "seen"
-            // (Bạn cần viết hàm update list message tại đây)
+            if (args.isNotEmpty()) {
+                val data = args[0] as JSONObject
+                val messageId = data.optString("messageId")
+
+                // Gọi Repository để cập nhật dữ liệu
+                // Không cần thao tác UI Thread ở đây vì StateFlow sẽ tự báo cho Compose
+                repository.updateMessageStatus(messageId, "seen")
+            }
         }
     }
 

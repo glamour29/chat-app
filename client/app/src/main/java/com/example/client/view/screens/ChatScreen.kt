@@ -42,6 +42,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         }
     }
 
+
     Scaffold(
         topBar = {
             TopAppBar(

@@ -39,6 +39,8 @@ fun MessageBubble(message: Message, isMe: Boolean,onSeen: () -> Unit = {}) {
     val imageBitmap = remember(message.content) {
         if (isImage) decodeBase64ToBitmap(message.content) else null
     }
+    val myMessageColor = Color(0xFFFFC107)
+
     // -----------------------
 
     Column(
@@ -50,34 +52,33 @@ fun MessageBubble(message: Message, isMe: Boolean,onSeen: () -> Unit = {}) {
         Box(
             modifier = Modifier
                 .background(
-                    color = if (message.type == "image") Color.Transparent
-                    else if (isMe) Color(0xFF0084FF)
-                    else Color(0xFFE4E6EB),
+                    color = if (isImage) Color.Transparent // Nếu là ảnh -> Trong suốt
+                    else if (isMe) myMessageColor // Nếu là text mình gửi -> Xanh
+                    else Color(0xFFE4E6EB), // Nếu là text bạn gửi -> Xám
                     shape = bubbleShape
                 )
-                .padding(if (message.type == "image") 0.dp else 12.dp)
+                // SỬA Ở ĐÂY: Dùng isImage để bỏ padding nếu là ảnh
+                .padding(if (isImage) 0.dp else 12.dp)
         ) {
-            // Lưu ý: Kiểm tra type là "image" hay "IMAGE" tùy thuộc server gửi về chữ thường hay hoa
-            // Server ở bước trước tôi viết là "image" (chữ thường)
-            if (message.type == "image" || message.type == "IMAGE") {
-
+            // SỬA Ở ĐÂY: Dùng biến isImage cho gọn
+            if (isImage) {
                 // --- HIỂN THỊ ẢNH TỪ BITMAP ---
                 if (imageBitmap != null) {
                     AsyncImage(
-                        model = imageBitmap, // Truyền Bitmap đã giải mã vào đây
+                        model = imageBitmap,
                         contentDescription = "Gửi ảnh",
                         modifier = Modifier
                             .widthIn(max = 250.dp)
                             .heightIn(max = 350.dp)
-                            .clip(bubbleShape),
+                            .clip(bubbleShape), // Bo góc ảnh theo hình tin nhắn
                         contentScale = ContentScale.Crop
                     )
                 } else {
-
                     Text("Lỗi tải ảnh", color = Color.Red, modifier = Modifier.padding(8.dp))
                 }
 
             } else {
+                // --- HIỂN THỊ TEXT ---
                 Text(
                     text = message.content,
                     color = if (isMe) Color.White else Color.Black,

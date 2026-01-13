@@ -98,4 +98,23 @@ class SocketRepository {
             status = json.optString("status", "sent")
         )
     }
+    fun updateMessageStatus(messageId: String, newStatus: String) {
+        // Lấy danh sách hiện tại
+        val currentList = _messages.value.toMutableList()
+
+        // Tìm vị trí tin nhắn
+        val index = currentList.indexOfFirst { it.id == messageId }
+
+        if (index != -1) {
+            // Cập nhật trạng thái
+            val oldMessage = currentList[index]
+            // Lưu ý: Message phải là data class để dùng .copy()
+            val updatedMessage = oldMessage.copy(status = newStatus)
+
+            currentList[index] = updatedMessage
+
+            // Đẩy dữ liệu mới vào luồng (StateFlow)
+            _messages.value = currentList
+        }
+    }
 }
