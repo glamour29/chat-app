@@ -5,7 +5,8 @@ const { Server } = require("socket.io");
 const cors = require('cors');
 const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
-const messageRoutes = require('./src/routes/messageRoutes'); // Route tin nhắn
+const messageRoutes = require('./src/routes/messageRoutes');
+const roomRoutes = require('./src/routes/roomRoutes'); // <--- [MỚI] Import Route Room
 const socketAuthMiddleware = require('./src/middlewares/socketAuth');
 const chatSocket = require('./src/sockets/chatSocket');
 require('dotenv').config();
@@ -22,7 +23,8 @@ app.use(express.json());
 
 // 3. Khai báo Routes API
 app.use('/api/auth', authRoutes);
-app.use('/api/messages', messageRoutes); // API lấy tin nhắn cũ
+app.use('/api/messages', messageRoutes); // API tin nhắn cũ
+app.use('/api/rooms', roomRoutes);       // <--- [MỚI] API quản lý phòng chat
 
 // 4. Khởi tạo Socket.IO
 const io = new Server(server, {
@@ -32,7 +34,7 @@ const io = new Server(server, {
     }
 });
 
-// 5. Kích hoạt bảo vệ Socket (Middleware)
+// 5. Kích hoạt bảo vệ Socket
 io.use(socketAuthMiddleware);
 
 // 6. Lắng nghe sự kiện Socket
@@ -54,7 +56,7 @@ server.listen(PORT, () => {
     console.log(`-----------------------------------`);
     console.log(`🚀 Server đang chạy tại: http://localhost:${PORT}`);
     console.log(`✅ API Auth sẵn sàng tại: http://localhost:${PORT}/api/auth/register`);
-    console.log(`✅ API Messages sẵn sàng tại: http://localhost:${PORT}/api/messages/:roomId`);
-    console.log(`🔐 Socket Security: ON (Yêu cầu Token)`);
+    console.log(`✅ API Rooms sẵn sàng tại: http://localhost:${PORT}/api/rooms`);
+    console.log(`🔐 Socket Security: ON`);
     console.log(`-----------------------------------`);
 });

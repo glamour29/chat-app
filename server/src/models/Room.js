@@ -3,34 +3,30 @@ const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
     name: {
-        type: String, // Tên nhóm (nếu là group chat)
-        default: "" 
+        type: String, 
+        default: "" // Tên nhóm (nếu là chat 1-1 thì để rỗng cũng được)
     },
     isGroup: {
         type: Boolean,
-        default: false // False = chat 1-1, True = chat nhóm
+        default: false // false: Chat 1-1, true: Chat nhóm
     },
     members: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User' // Danh sách id của các thành viên trong nhóm
+        ref: 'User', // Liên kết sang bảng User
+        required: true
     }],
     admin: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User' // Trưởng nhóm (người tạo group)
+        ref: 'User' // Chỉ dùng khi isGroup = true
     },
     lastMessage: {
-        type: String, // Lưu text tin nhắn cuối cùng để hiển thị ở danh sách cho nhanh
-        default: ""
+        type: String, 
+        default: "Trò chuyện mới"
     },
     lastMessageTime: {
         type: Date,
         default: Date.now
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
     }
-});
+}, { timestamps: true }); // Tự động tạo createdAt và updatedAt
 
-const Room = mongoose.model('Room', roomSchema);
-module.exports = Room;
+module.exports = mongoose.model('Room', roomSchema);
