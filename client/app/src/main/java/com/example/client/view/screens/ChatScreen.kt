@@ -43,10 +43,20 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             viewModel.sendImage(context, uri)
         }
     }
+
+    LaunchedEffect(Unit) {
+        viewModel.joinRoom(viewModel.currentRoomId)
+    }
     LaunchedEffect(messages.size) {
-        // Index 0 là vị trí dưới cùng (do reverseLayout = true)
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            val lastIndex = messages.size - 1
+            // Nếu tin nhắn nhiều (do vừa load lịch sử) -> Cuộn ngay lập tức (scrollToItem)
+            // Nếu tin nhắn ít (do chat mới) -> Cuộn mượt (animateScrollToItem)
+            if (messages.size > 10 && listState.firstVisibleItemIndex < 2) {
+                listState.scrollToItem(lastIndex)
+            } else {
+                listState.animateScrollToItem(lastIndex)
+            }
         }
     }
 

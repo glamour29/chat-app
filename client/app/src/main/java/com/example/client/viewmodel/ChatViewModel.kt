@@ -1,5 +1,6 @@
 package com.example.client.viewmodel
 
+import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -7,29 +8,34 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.client.model.data.Message
 import com.example.client.model.repository.SocketRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.UUID
 
-class ChatViewModel : ViewModel() {
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SocketRepository()
 
     val messages: StateFlow<List<Message>> = repository.messages
 
-    // Giả lập thông tin User hiện tại (Sau này lấy từ Login của Kiên)
-    val currentUserId = "user_${UUID.randomUUID().toString().substring(0, 5)}"
+
+    val currentUserId: String
+
+    // Phòng chat cố định (để test)
     val currentRoomId = "room_abc"
 
     private val _typingUser = MutableStateFlow<String?>(null)
     val typingUser: StateFlow<String?> = _typingUser
 
-    // Biến hỗ trợ debounce (tránh gửi signal liên tục)
     private var typingHandler: Handler = Handler(Looper.getMainLooper())
     private val stopTypingRunnable = Runnable {
         repository.sendStopTyping(currentRoomId)
@@ -37,8 +43,41 @@ class ChatViewModel : ViewModel() {
     }
 
     init {
+        val prefs = application.getSharedPreferences("chat_app_prefs", Context.MODE_PRIVATE)
+        var savedId = prefs.getString("user_id", null)
+
+        if (savedId == null) {
+            // Nếu chưa có (lần đầu mở app), tạo ID mới và lưu lại
+            savedId = "user_${UUID.randomUUID().toString().substring(0, 5)}"
+            prefs.edit().putString("user_id", savedId).apply()
+        }
+        currentUserId = savedId
+
+        // 2. Kết nối Socket
         repository.connect()
+
+        // 3. Lắng nghe lịch sử
+        repository.socket.on("load_history") { args ->
+            if (args.isNotEmpty()) {
+                val jsonArray = args[0] as JSONArray
+                val historyList = ArrayList<Message>()
+
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val message = Message.fromJson(jsonObject)
+                    historyList.add(message)
+                }
+
+                // Cập nhật list tin nhắn (chạy trên UI Scope để an toàn)
+                viewModelScope.launch {
+                    repository.updateMessageList(historyList)
+                }
+            }
+        }
+
         joinRoom(currentRoomId)
+
+        // Các sự kiện lắng nghe khác giữ nguyên
         repository.socket.on("user_typing") { args ->
             val userId = args[0] as String
             if (userId != currentUserId) {
@@ -50,14 +89,10 @@ class ChatViewModel : ViewModel() {
             _typingUser.value = null
         }
 
-        // Lắng nghe sự kiện tin nhắn đã được xem
         repository.socket.on("message_seen_updated") { args ->
             if (args.isNotEmpty()) {
                 val data = args[0] as JSONObject
                 val messageId = data.optString("messageId")
-
-                // Gọi Repository để cập nhật dữ liệu
-                // Không cần thao tác UI Thread ở đây vì StateFlow sẽ tự báo cho Compose
                 repository.updateMessageStatus(messageId, "seen")
             }
         }

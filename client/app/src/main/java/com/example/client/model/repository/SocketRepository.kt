@@ -117,4 +117,8 @@ class SocketRepository {
             _messages.value = currentList
         }
     }
+    fun updateMessageList(newList: List<Message>) {
+
+        _messages.value = newList
+    }
 }
