@@ -1,7 +1,7 @@
 // src/controllers/roomController.js
 const Room = require('../models/Room');
 
-// 1. Lấy phòng chat với một người cụ thể (Tìm hoặc Tạo mới)
+// 1. Lấy phòng chat với một người cụ thể (Tìm hoặc Tạo mới - Chat 1-1)
 exports.getRoomWithUser = async (req, res) => {
     try {
         const myId = req.user.userId; // Lấy từ Token
@@ -9,7 +9,7 @@ exports.getRoomWithUser = async (req, res) => {
 
         // --- 📸 DEBUG LOG (Kiểm tra dữ liệu đầu vào) ---
         console.log("-------------------------------");
-        console.log("🔍 [API] Mở phòng chat:");
+        console.log("🔍 [API] Mở phòng chat 1-1:");
         console.log("👉 User ID (Tôi):", myId);
         console.log("👉 Partner ID:", partnerId);
         
@@ -19,7 +19,6 @@ exports.getRoomWithUser = async (req, res) => {
         }
 
         // Tìm xem đã có phòng 1-1 nào chứa cả 2 người này chưa
-        // Lưu ý: Phải tìm đúng tên trường là 'members' và 'isGroup: false'
         let room = await Room.findOne({
             isGroup: false, 
             members: { $all: [myId, partnerId] }
@@ -31,7 +30,7 @@ exports.getRoomWithUser = async (req, res) => {
             room = new Room({
                 isGroup: false,
                 name: "", // Chat 1-1 không cần tên
-                members: [myId, partnerId], // <--- QUAN TRỌNG: Dùng 'members'
+                members: [myId, partnerId],
                 lastMessage: "Bắt đầu cuộc trò chuyện",
                 lastMessageTime: new Date()
             });
@@ -61,19 +60,61 @@ exports.getMyRooms = async (req, res) => {
         
         // ---> LOG DEBUG <---
         console.log("--- 📥 [API] Lấy danh sách Inbox ---");
-        console.log("👤 User ID:", myId);
         
-        // Tìm tất cả phòng mà tôi là thành viên (có id của tôi trong mảng members)
+        // Tìm tất cả phòng mà tôi là thành viên
         const rooms = await Room.find({ members: myId })
             .sort({ lastMessageTime: -1 }) // Sắp xếp tin mới nhất lên đầu
             .populate('members', 'username fullName avatarUrl'); // Lấy chi tiết user
 
         console.log("📦 Số phòng tìm thấy:", rooms.length);
-        // ---------------------------
-
+        
         res.json(rooms);
     } catch (error) {
         console.error("❌ Lỗi:", error);
+        res.status(500).json({ message: "Lỗi Server: " + error.message });
+    }
+};
+
+// 3. Tạo nhóm chat mới (Group Chat)
+exports.createGroup = async (req, res) => {
+    try {
+        const myId = req.user.userId;
+        const { name, members } = req.body; 
+        // members là mảng các ID user khác được thêm vào: ["id_user_1", "id_user_2"]
+
+        console.log("--- 👥 [API] Tạo Group Chat ---");
+        console.log("Tên nhóm:", name);
+        console.log("Thành viên thêm vào:", members);
+
+        // Validate dữ liệu
+        if (!name || !members || !Array.isArray(members) || members.length === 0) {
+            return res.status(400).json({ message: "Tên nhóm và danh sách thành viên không hợp lệ!" });
+        }
+
+        // Tạo danh sách thành viên đầy đủ (bao gồm cả Admin là người tạo)
+        const allMembers = [myId, ...members];
+
+        // Tạo phòng mới
+        const newGroup = new Room({
+            name: name,
+            isGroup: true,
+            admin: myId, // Người tạo là Admin
+            members: allMembers,
+            lastMessage: "Nhóm vừa được tạo",
+            lastMessageTime: new Date()
+        });
+
+        await newGroup.save();
+
+        // Populate thông tin để trả về cho Frontend hiển thị ngay lập tức
+        const fullGroup = await Room.findById(newGroup._id)
+            .populate('members', 'username fullName avatarUrl');
+
+        console.log(`✅ Đã tạo nhóm thành công: ${fullGroup._id}`);
+        res.json(fullGroup);
+
+    } catch (error) {
+        console.error("❌ Lỗi tạo nhóm:", error);
         res.status(500).json({ message: "Lỗi Server: " + error.message });
     }
 };
