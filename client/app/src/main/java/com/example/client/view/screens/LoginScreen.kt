@@ -136,7 +136,8 @@ fun performLogin(
             if (response.isSuccessful) {
                 val loginData = response.body()
                 if (loginData?.token != null) {
-                    val userId = loginData.user?._id ?: "" // Lấy ID
+                    // Đổi _id thành id
+                    val userId = loginData.user?.id ?: "" // Lấy ID
 
                     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
                     with(sharedPref.edit()) {

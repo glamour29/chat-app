@@ -1,19 +1,12 @@
 package com.example.client.view.screens
 
 import android.content.Context
-import android.net.Uri
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,14 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import androidx.compose.material.icons.filled.Settings
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     isDarkTheme: Boolean,
@@ -39,126 +31,50 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
+    val username = sharedPref.getString("USERNAME", "Unknown User") ?: "User"
 
-    // Lấy thông tin user
-    val username = sharedPref.getString("USERNAME", "User") ?: "User"
-    // Lấy avatar (Ưu tiên ảnh vừa chọn trên máy -> sau đó đến ảnh từ server)
-    val savedAvatarStr = sharedPref.getString("LOCAL_AVATAR", null)
-        ?: sharedPref.getString("AVATAR_URL", "https://i.imgur.com/6VBx3io.png")
-
-    // State hiển thị ảnh
-    var currentAvatarUri by remember { mutableStateOf<Any?>(savedAvatarStr) }
-
-    // Bộ chọn ảnh từ thư viện
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri: Uri? ->
-            if (uri != null) {
-                // 1. Cập nhật giao diện ngay
-                currentAvatarUri = uri
-                // 2. Lưu đường dẫn ảnh vào máy
-                sharedPref.edit().putString("LOCAL_AVATAR", uri.toString()).apply()
-                Toast.makeText(context, "Đã lưu ảnh (Trên máy)", Toast.LENGTH_SHORT).show()
-            }
-        }
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding() // 🔥 QUAN TRỌNG: Đẩy nội dung xuống khỏi tai thỏ/thanh trạng thái
-    ) {
-        // --- HEADER: Nút Back và Tiêu đề ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = "Quản lý hồ sơ",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Trang cá nhân", fontWeight = FontWeight.SemiBold, fontSize = 18.sp) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
             )
         }
-
-        // --- PHẦN AVATAR VÀ TÊN ---
+    ) { paddingValues ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 20.dp),
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Avatar Placeholder
             Box(
-                contentAlignment = Alignment.BottomEnd,
                 modifier = Modifier
                     .size(120.dp)
-                    .clickable {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    }
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
+                contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(currentAvatarUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Avatar",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(Color.Gray)
-                )
-
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .padding(2.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Change Avatar",
-                        tint = Color.White,
-                        modifier = Modifier.padding(6.dp)
-                    )
-                }
+                Text(text = username.take(1).uppercase(), fontSize = 40.sp, color = Color.White)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Text(
-                text = username,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
+            Text(text = "Xin chào,", fontSize = 18.sp, color = Color.Gray)
+            Text(text = username, fontSize = 28.sp, fontWeight = FontWeight.Bold)
 
-        Divider(thickness = 0.5.dp, color = Color.LightGray)
+            Spacer(modifier = Modifier.height(40.dp))
 
-        // --- MENU SETTINGS ---
-        Column(modifier = Modifier.padding(16.dp)) {
-
-            // Item 1: Chế độ tối
+            // Chế độ tối
             ProfileMenuItem(
-                icon = Icons.Default.DarkMode,
+                icon = Icons.Default.Settings, // Icon Dark Mode
                 title = "Chế độ tối",
                 trailing = {
                     Switch(
@@ -169,36 +85,36 @@ fun ProfileScreen(
                 onClick = { onToggleTheme() }
             )
 
-            // Item 2: Đăng xuất
-            ProfileMenuItem(
-                icon = Icons.Default.Logout,
-                title = "Đăng xuất",
-                textColor = Color.Red,
-                iconColor = Color.Red,
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Nút Đăng xuất
+            Button(
                 onClick = {
                     val editor = sharedPref.edit()
-
-                    // 1. Xóa thông tin User (Bắt buộc)
+                    // Xóa thông tin User (Giữ lại cấu hình Dark Mode của User đó nếu cần,
+                    // nhưng code AppNavigation đã xử lý reset màu rồi nên xóa ở đây cũng an toàn)
                     editor.remove("TOKEN")
                     editor.remove("USER_ID")
                     editor.remove("USERNAME")
                     editor.remove("AVATAR_URL")
-                    editor.remove("IS_DARK_MODE")
                     editor.remove("LOCAL_AVATAR")
-
                     editor.apply()
 
-                    // 4. Ngắt kết nối socket
-                    com.example.client.api.SocketHandler.closeConnection()
-
+                    // Gọi callback logout ra ngoài AppNavigation xử lý tiếp
                     onLogout()
-                }
-            )
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Logout, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("ĐĂNG XUẤT", color = Color.White, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
-// Component con giữ nguyên
 @Composable
 fun ProfileMenuItem(
     icon: ImageVector,
@@ -206,7 +122,10 @@ fun ProfileMenuItem(
     textColor: Color = MaterialTheme.colorScheme.onBackground,
     iconColor: Color = MaterialTheme.colorScheme.onBackground,
     trailing: @Composable (() -> Unit)? = null,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier, // Thêm modifier để linh hoạt
+    colors: ButtonColors? = null, // Thêm colors
+    shape: androidx.compose.ui.graphics.Shape? = null // Thêm shape
 ) {
     Row(
         modifier = Modifier

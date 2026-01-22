@@ -1,10 +1,5 @@
-package com.example.client.models
-
-// 1. Dữ liệu gửi lên khi Đăng nhập
-data class LoginRequest(
-    val username: String,
-    val password: String
-)
+// File này đã được chuyển sang thư mục models/AuthModels.kt để tránh trùng lặp.
+// Vui lòng không định nghĩa lại class tại đây.
 
 // 2. Dữ liệu gửi lên khi Đăng ký
 data class RegisterRequest(

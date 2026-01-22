@@ -18,8 +18,8 @@ import com.example.client.viewmodel.ChatViewModel
 fun AppNavigation(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onUserLogin: (String) -> Unit,  // Mới: Nhận ID user khi login
-    onUserLogout: () -> Unit        // Mới: Xử lý khi logout
+    onUserLogin: (String) -> Unit,  // Nhận ID user khi login để Main đổi màu
+    onUserLogout: () -> Unit        // Nhận lệnh logout để Main reset màu
 ) {
     val navController = rememberNavController()
     val chatViewModel: ChatViewModel = viewModel()
@@ -39,23 +39,22 @@ fun AppNavigation(
 
     NavHost(navController = navController, startDestination = startDest) {
 
-        // 1. Màn hình Đăng Nhập
+        // 1. LOGIN SCREEN
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { userId -> // Nhận userId từ LoginScreen
-                    onUserLogin(userId) // Báo cho MainActivity biết để đổi màu
+                onLoginSuccess = { userId ->
+                    // 🔥 QUAN TRỌNG: Báo cho MainActivity biết user nào vừa vào để đổi Theme
+                    onUserLogin(userId)
 
                     navController.navigate("users") {
                         popUpTo("login") { inclusive = true }
                     }
                 },
-                onNavigateToRegister = {
-                    navController.navigate("register")
-                }
+                onNavigateToRegister = { navController.navigate("register") }
             )
         }
 
-        // ... (Giữ nguyên màn hình Register)
+        // 2. REGISTER SCREEN
         composable("register") {
             RegisterScreen(
                 onRegisterSuccess = {
@@ -67,7 +66,7 @@ fun AppNavigation(
             )
         }
 
-        // ... (Giữ nguyên màn hình Users)
+        // 3. USERS SCREEN (Đã bỏ tham số gây lỗi pending_requests)
         composable("users") {
             UsersScreenImproved(
                 viewModel = chatViewModel,
@@ -80,17 +79,23 @@ fun AppNavigation(
                 },
                 onOpenNewMessage = { navController.navigate("new_message") },
                 onOpenProfile = { navController.navigate("profile") }
+                // ⚠️ Đã xóa onOpenPendingRequests vì file UsersScreenImproved chưa hỗ trợ
             )
         }
 
-        // 4. Màn hình Profile
+        // 4. PROFILE SCREEN
         composable("profile") {
             ProfileScreen(
                 isDarkTheme = isDarkTheme,
                 onToggleTheme = onToggleTheme,
                 onLogout = {
-                    onUserLogout() // Báo cho MainActivity biết để reset màu
+                    // 🔥 QUAN TRỌNG: Báo cho MainActivity reset theme về Sáng
+                    onUserLogout()
 
+                    // Ngắt kết nối socket
+                    chatViewModel.disconnect()
+
+                    // Quay về Login
                     navController.navigate("login") {
                         popUpTo(0) { inclusive = true }
                     }
@@ -99,7 +104,7 @@ fun AppNavigation(
             )
         }
 
-        // ... (Giữ nguyên các màn hình khác: new_message, add_contact, chat...)
+        // 5. NEW MESSAGE
         composable("new_message") {
             NewMessageScreen(
                 viewModel = chatViewModel,
@@ -109,37 +114,36 @@ fun AppNavigation(
                     navController.navigate("chat/${room.id}/${Uri.encode(room.name)}")
                 },
                 onAddContact = { navController.navigate("add_contact") },
-                onCreateGroup = { groupName, memberIds ->
-                    val room = chatViewModel.createGroup(groupName, memberIds)
-                    navController.navigate("group/${room.id}/${Uri.encode(room.name)}/${memberIds.size + 1}")
+                onCreateGroup = { name, ids ->
+                    val room = chatViewModel.createGroup(name, ids)
+                    navController.navigate("group/${room.id}/${Uri.encode(room.name)}/${ids.size + 1}")
                 }
             )
         }
 
+        // 6. ADD CONTACT
         composable("add_contact") {
             AddNewContactScreen(
-                onBack = { navController.popBackStack() },
-                onSave = { _, _ -> navController.popBackStack() }
+                viewModel = chatViewModel, // 1. Thêm viewModel vào
+                onBack = { navController.popBackStack() } // 2. Giữ nguyên nút Back
+                // 3. Đã xóa onSave vì màn hình này tự xử lý lưu rồi
             )
         }
 
+        // 7. CHAT SCREEN
         composable(
             route = "chat/{roomId}/{roomName}",
-            arguments = listOf(
-                navArgument("roomId") { type = NavType.StringType },
-                navArgument("roomName") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("roomId") { type = NavType.StringType }, navArgument("roomName") { type = NavType.StringType })
         ) { backStackEntry ->
-            val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
-            val roomName = backStackEntry.arguments?.getString("roomName") ?: "Chat"
             ChatScreenImprovedScreen(
-                roomId = roomId,
-                roomName = Uri.decode(roomName),
+                roomId = backStackEntry.arguments?.getString("roomId") ?: "",
+                roomName = Uri.decode(backStackEntry.arguments?.getString("roomName") ?: "Chat"),
                 viewModel = chatViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
 
+        // 8. GROUP CHAT
         composable(
             route = "group/{roomId}/{roomName}/{memberCount}",
             arguments = listOf(
@@ -148,11 +152,9 @@ fun AppNavigation(
                 navArgument("memberCount") { type = NavType.IntType }
             )
         ) { backStackEntry ->
-            val roomId = backStackEntry.arguments?.getString("roomId") ?: return@composable
-            val roomName = backStackEntry.arguments?.getString("roomName") ?: "Group"
             ChatScreenImprovedScreen(
-                roomId = roomId,
-                roomName = Uri.decode(roomName),
+                roomId = backStackEntry.arguments?.getString("roomId") ?: "",
+                roomName = Uri.decode(backStackEntry.arguments?.getString("roomName") ?: "Group"),
                 viewModel = chatViewModel,
                 onBack = { navController.popBackStack() }
             )
