@@ -3,75 +3,70 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Hàm Đăng ký
+// 1. Hàm Đăng ký (Register)
 exports.register = async (req, res) => {
-    try {
-        // 1. Lấy dữ liệu từ Client gửi lên
-        const { username, password, fullName } = req.body;
+    try {const { username, password, fullName, phoneNumber } = req.body;
 
-        // 2. Kiểm tra xem user đã tồn tại chưa
+        // Kiểm tra user tồn tại
         const existingUser = await User.findOne({ username });
         if (existingUser) {
             return res.status(400).json({ message: "Tài khoản đã tồn tại!" });
         }
 
-        // 3. Mã hóa mật khẩu (Băm mật khẩu)
-        // Ví dụ: "123456" -> "$2a$10$Xk9..."
+        // Mã hóa mật khẩu
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 4. Tạo User mới
+        // Tạo User mới (có lưu phoneNumber)
         const newUser = new User({
             username,
-            password: hashedPassword, // Lưu mật khẩu đã mã hóa
-            fullName
+            password: hashedPassword,
+            fullName,
+            phoneNumber: phoneNumber || ""
         });
 
-        // 5. Lưu vào DB
         await newUser.save();
 
-        // 6. Trả về thông báo thành công
         res.status(201).json({ 
             message: "Đăng ký thành công!",
             user: {
                 _id: newUser._id,
                 username: newUser.username,
-                fullName: newUser.fullName
+                fullName: newUser.fullName,
+                phoneNumber: newUser.phoneNumber
             }
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Register Error:", error);
         res.status(500).json({ message: "Lỗi Server: " + error.message });
     }
 };
 
-// Hàm Đăng nhập
+// 2. Hàm Đăng nhập (Login)
 exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        // 1. Tìm user trong DB
+        // Tìm user
         const user = await User.findOne({ username });
         if (!user) {
             return res.status(400).json({ message: "Sai tên đăng nhập hoặc mật khẩu!" });
         }
 
-        // 2. So sánh mật khẩu (User gửi lên vs Mật khẩu mã hóa trong DB)
+        // Kiểm tra mật khẩu
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: "Sai tên đăng nhập hoặc mật khẩu!" });
         }
 
-        // 3. Tạo Token (Vé thông hành)
-        // Token này chứa ID của user, dùng để xác thực các request sau này
+        // Tạo JWT Token
         const token = jwt.sign(
             { userId: user._id },
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' } // Token sống 30 ngày mới hết hạn
+            process.env.JWT_SECRET || 'secret_key',
+            { expiresIn: '30d' }
         );
 
-        // 4. Trả về Token và thông tin User
         res.json({
             message: "Đăng nhập thành công!",
             token,
@@ -79,12 +74,13 @@ exports.login = async (req, res) => {
                 _id: user._id,
                 username: user.username,
                 fullName: user.fullName,
-                avatarUrl: user.avatarUrl
+                avatarUrl: user.avatarUrl,
+                phoneNumber: user.phoneNumber
             }
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Login Error:", error);
         res.status(500).json({ message: "Lỗi Server: " + error.message });
     }
 };
