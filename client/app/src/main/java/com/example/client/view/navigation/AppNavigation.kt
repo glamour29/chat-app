@@ -15,20 +15,22 @@ import com.example.client.view.screens.*
 import com.example.client.viewmodel.ChatViewModel
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    onUserLogin: (String) -> Unit,  // Mới: Nhận ID user khi login
+    onUserLogout: () -> Unit        // Mới: Xử lý khi logout
+) {
     val navController = rememberNavController()
     val chatViewModel: ChatViewModel = viewModel()
     val context = LocalContext.current
 
-    // Lấy Token đã lưu
     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
     val savedToken = sharedPref.getString("TOKEN", null)
     val savedUserId = sharedPref.getString("USER_ID", null)
 
-    //LOGIC QUAN TRỌNG: Nếu chưa có Token thì vào Login, có rồi thì vào Users
     val startDest = if (savedToken != null) "users" else "login"
 
-    // Tự động kết nối Socket nếu có thông tin
     LaunchedEffect(savedToken, savedUserId) {
         if (savedToken != null && savedUserId != null) {
             chatViewModel.connect(savedToken, savedUserId)
@@ -40,7 +42,9 @@ fun AppNavigation() {
         // 1. Màn hình Đăng Nhập
         composable("login") {
             LoginScreen(
-                onLoginSuccess = {
+                onLoginSuccess = { userId -> // Nhận userId từ LoginScreen
+                    onUserLogin(userId) // Báo cho MainActivity biết để đổi màu
+
                     navController.navigate("users") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -51,7 +55,7 @@ fun AppNavigation() {
             )
         }
 
-        // 2. Màn hình Đăng Ký
+        // ... (Giữ nguyên màn hình Register)
         composable("register") {
             RegisterScreen(
                 onRegisterSuccess = {
@@ -59,17 +63,14 @@ fun AppNavigation() {
                         popUpTo("register") { inclusive = true }
                     }
                 },
-                onNavigateToLogin = {
-                    navController.popBackStack()
-                }
+                onNavigateToLogin = { navController.popBackStack() }
             )
         }
 
-        // 3. Màn hình Danh sách User (ĐÃ GỘP VÀ SỬA LỖI)
+        // ... (Giữ nguyên màn hình Users)
         composable("users") {
             UsersScreenImproved(
                 viewModel = chatViewModel,
-                // Logic mở khung chat
                 onOpenChat = { roomId, roomName, isGroup, memberCount ->
                     if (isGroup && memberCount != null) {
                         navController.navigate("group/$roomId/${Uri.encode(roomName)}/$memberCount")
@@ -77,9 +78,7 @@ fun AppNavigation() {
                         navController.navigate("chat/$roomId/${Uri.encode(roomName)}")
                     }
                 },
-                // Logic mở màn hình tin nhắn mới
                 onOpenNewMessage = { navController.navigate("new_message") },
-                // Logic mở Profile (SỬA LỖI Ở ĐÂY)
                 onOpenProfile = { navController.navigate("profile") }
             )
         }
@@ -87,15 +86,20 @@ fun AppNavigation() {
         // 4. Màn hình Profile
         composable("profile") {
             ProfileScreen(
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
                 onLogout = {
+                    onUserLogout() // Báo cho MainActivity biết để reset màu
+
                     navController.navigate("login") {
-                        popUpTo(0) { inclusive = true } // Xóa hết stack khi logout
+                        popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 
-        // 5. Màn hình Tin nhắn mới
+        // ... (Giữ nguyên các màn hình khác: new_message, add_contact, chat...)
         composable("new_message") {
             NewMessageScreen(
                 viewModel = chatViewModel,
@@ -112,7 +116,6 @@ fun AppNavigation() {
             )
         }
 
-        // 6. Màn hình Thêm bạn
         composable("add_contact") {
             AddNewContactScreen(
                 onBack = { navController.popBackStack() },
@@ -120,7 +123,6 @@ fun AppNavigation() {
             )
         }
 
-        // 7. Màn hình Chat 1-1
         composable(
             route = "chat/{roomId}/{roomName}",
             arguments = listOf(
@@ -138,7 +140,6 @@ fun AppNavigation() {
             )
         }
 
-        // 8. Màn hình Chat Nhóm
         composable(
             route = "group/{roomId}/{roomName}/{memberCount}",
             arguments = listOf(

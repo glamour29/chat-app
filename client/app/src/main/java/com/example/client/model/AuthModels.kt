@@ -19,5 +19,12 @@ data class LoginResponse(
     val message: String?,
     val token: String?,     // 👈 Đây là vé thông hành
     val userId: String?,    // 👈 ID của người dùng
-    val username: String?
+    val username: String?,
+    val user: UserData
+)
+data class UserData(
+    val _id: String?,
+    val username: String?,
+    val fullName: String?,
+    val avatarUrl: String?
 )

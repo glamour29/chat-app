@@ -28,7 +28,7 @@ import retrofit2.Response
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit, // Hàm callback để chuyển sang Home
+    onLoginSuccess: (String) -> Unit, // Hàm callback để chuyển sang Home
     onNavigateToRegister: () -> Unit // Hàm callback để chuyển sang Register
 ) {
     // 1. Quản lý trạng thái (State)
@@ -89,15 +89,13 @@ fun LoginScreen(
         Button(
             onClick = {
                 if (username.isNotEmpty() && password.isNotEmpty()) {
-                    isLoading = true // Bắt đầu quay
+                    isLoading = true
                     performLogin(context, username, password,
-                        onSuccess = {
+                        onSuccess = { userId -> // Nhận userId từ hàm performLogin
                             isLoading = false
-                            onLoginSuccess() // Chuyển màn hình
+                            onLoginSuccess(userId) // Truyền userId ra ngoài
                         },
-                        onError = {
-                            isLoading = false
-                        }
+                        onError = { isLoading = false }
                     )
                 } else {
                     Toast.makeText(context, "Vui lòng nhập đủ thông tin!", Toast.LENGTH_SHORT).show()
@@ -127,10 +125,9 @@ fun performLogin(
     context: Context,
     user: String,
     pass: String,
-    onSuccess: () -> Unit,
+    onSuccess: (String) -> Unit, // Callback nhận String
     onError: () -> Unit
 ) {
-    // ĐÚNG: Sử dụng trực tiếp instance
     val authService = RetrofitClient.instance
     val request = LoginRequest(user, pass)
 
@@ -139,19 +136,22 @@ fun performLogin(
             if (response.isSuccessful) {
                 val loginData = response.body()
                 if (loginData?.token != null) {
-                    // 🔥 LƯU TOKEN VÀO SHAREDPREFERENCES (QUAN TRỌNG)
+                    val userId = loginData.user?._id ?: "" // Lấy ID
+
                     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
                     with(sharedPref.edit()) {
-                        putString("TOKEN", loginData.token)
-                        putString("USER_ID", loginData.userId)
-                        putString("USERNAME", loginData.username)
+                        putString("USER_ID", userId)
+                        putString("USERNAME", loginData.user?.username)
+                        putString("AVATAR_URL", loginData.user?.avatarUrl)
                         apply()
                     }
-                    com.example.client.api.SocketHandler.setSocket(loginData.token) // Set token cho socket
-                    com.example.client.api.SocketHandler.establishConnection()      // Bắt đầu kết nối
-                    Log.d("TOKEN_CUA_TUI", "Token là: ${loginData.token}")
+
+                    com.example.client.api.SocketHandler.setSocket(loginData.token)
+                    com.example.client.api.SocketHandler.establishConnection()
+
                     Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                    onSuccess()
+
+                    onSuccess(userId) // 🔥 TRẢ VỀ USER ID ĐỂ MAIN BIẾT MÀ ĐỔI MÀU
                 } else {
                     Toast.makeText(context, "Lỗi: ${loginData?.message}", Toast.LENGTH_SHORT).show()
                     onError()
