@@ -14,6 +14,7 @@ data class ChatRoom(
     val memberIds: List<String> = emptyList(),
 
     val lastMessage: String = "",
+    val members: List<User> = emptyList(),
 
 
     val lastUpdated: Long = 0L,

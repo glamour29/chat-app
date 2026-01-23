@@ -3,7 +3,6 @@
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,13 +36,12 @@ fun UsersScreenImproved(
     onOpenProfile: () -> Unit,
     onOpenPendingRequests: () -> Unit = {}
 ) {
-    // Sử dụng friends thay vì users để khớp với ChatViewModel mới
     val friends by viewModel.friends.collectAsState()
     val rooms by viewModel.rooms.collectAsState()
+    val currentUserId by viewModel.currentUserIdState.collectAsState()
 
     var showCreateGroup by remember { mutableStateOf(false) }
 
-    // Sắp xếp danh sách phòng chat theo thời gian và ghim
     val filteredRooms = remember(rooms) {
         rooms.filter { !it.isArchived }
             .sortedWith(compareByDescending<ChatRoom> { it.isPinned }
@@ -63,7 +61,6 @@ fun UsersScreenImproved(
     ) { paddingValues ->
         Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
-            // 🔔 THANH THÔNG BÁO LỜI MỜI KẾT BẠN
             if (pendingRequestsExternal.isNotEmpty()) {
                 Surface(
                     modifier = Modifier
@@ -95,11 +92,11 @@ fun UsersScreenImproved(
                     ChatList(
                         rooms = filteredRooms,
                         users = friends,
-                        currentUserId = viewModel.currentUserId,
-                        onRoomClick = { room ->
-                            // Đồng bộ với hàm setActiveRoom trong ChatViewModel
-                            viewModel.setActiveRoom(room.id, room.name)
-                            onOpenChat(room.id, room.name, room.isGroup, if (room.isGroup) room.memberIds.size else null)
+                        currentUserId = currentUserId,
+                        viewModel = viewModel, // Truyền viewModel để dùng hàm lấy tên
+                        onRoomClick = { room, displayName ->
+                            viewModel.setActiveRoom(room.id, displayName)
+                            onOpenChat(room.id, displayName, room.isGroup, if (room.isGroup) room.memberIds.size else null)
                         }
                     )
                 } else {
@@ -109,14 +106,13 @@ fun UsersScreenImproved(
         }
     }
 
-    // Dialog tạo nhóm mới
     if (showCreateGroup) {
         CreateGroupDialog(
-            users = friends.filter { it.id != viewModel.currentUserId },
+            users = friends.filter { it.id != currentUserId },
             onDismiss = { showCreateGroup = false },
             onCreate = { name, memberIds ->
                 val room = viewModel.createGroup(name, memberIds)
-                onOpenChat(room.id, room.name, true, memberIds.size + 1)
+                onOpenChat(room.id, name, true, memberIds.size + 1)
                 showCreateGroup = false
             }
         )
@@ -128,29 +124,33 @@ fun ChatList(
     rooms: List<ChatRoom>,
     users: List<User>,
     currentUserId: String,
-    onRoomClick: (ChatRoom) -> Unit
+    viewModel: ChatViewModel,
+    onRoomClick: (ChatRoom, String) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         items(rooms, key = { it.id }) { room ->
+            // Tính toán tên hiển thị ngay tại đây
+            val displayName = viewModel.getDisplayRoomName(room, currentUserId)
+
             ChatItem(
                 room = room,
+                displayName = displayName, // Truyền tên đã xử lý vào
                 users = users,
                 currentUserId = currentUserId,
-                onClick = { onRoomClick(room) }
+                onClick = { onRoomClick(room, displayName) }
             )
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatItem(
     room: ChatRoom,
+    displayName: String,
     users: List<User>,
     currentUserId: String,
     onClick: () -> Unit
 ) {
-    // Format thời gian từ timestamp để tránh lỗi chuỗi ISO dài
     val formattedTime = remember(room.lastUpdated) {
         if (room.lastUpdated > 0) {
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(room.lastUpdated))
@@ -188,7 +188,7 @@ fun ChatItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = room.name,
+                        text = displayName, // Sử dụng displayName thay vì room.name
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         maxLines = 1,
@@ -205,15 +205,36 @@ fun ChatItem(
                 Text(
                     text = if (room.lastMessage.isBlank()) "Bắt đầu trò chuyện" else room.lastMessage,
                     fontSize = 13.sp,
-                    color = Color.Gray,
+                    color = if (room.unreadCount > 0) MaterialTheme.colorScheme.primary else Color.Gray,
+                    fontWeight = if (room.unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
+            if (room.unreadCount > 0) {
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    modifier = Modifier.size(20.dp),
+                    shape = CircleShape,
+                    color = TealPrimary
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            room.unreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+// Các Component phụ giữ nguyên nhưng đảm bảo import đầy đủ
 @Composable
 private fun ChatItemAvatar(room: ChatRoom, isOnline: Boolean) {
     Box {

@@ -54,24 +54,17 @@ exports.getRoomWithUser = async (req, res) => {
 };
 
 // 2. Lấy danh sách các phòng chat của tôi (Inbox)
+// server/src/controllers/roomController.js
+// server/src/controllers/roomController.js
 exports.getMyRooms = async (req, res) => {
     try {
         const myId = req.user.userId;
-        
-        // ---> LOG DEBUG <---
-        console.log("--- 📥 [API] Lấy danh sách Inbox ---");
-        
-        // Tìm tất cả phòng mà tôi là thành viên
         const rooms = await Room.find({ members: myId })
-            .sort({ lastMessageTime: -1 }) // Sắp xếp tin mới nhất lên đầu
-            .populate('members', 'username fullName avatarUrl'); // Lấy chi tiết user
-
-        console.log("📦 Số phòng tìm thấy:", rooms.length);
-        
+            .populate('members', 'username fullName avatarUrl') // Quan trọng nhất
+            .sort({ lastMessageTime: -1 });
         res.json(rooms);
     } catch (error) {
-        console.error("❌ Lỗi:", error);
-        res.status(500).json({ message: "Lỗi Server: " + error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 

@@ -52,6 +52,15 @@ class ChatService {
         
         return room;
     }
+    // Kiểm tra hàm này trong ChatService hoặc RoomRepository
+        async createPrivateRoom(userId1, userId2) {
+            const newRoom = new Room({
+                isGroup: false,
+                members: [userId1, userId2], // Phải đảm bảo có cả 2 ID ở đây
+                lastMessage: "Bắt đầu cuộc trò chuyện"
+            });
+            return await newRoom.save();
+        }
     
     async createGroup(name, memberIds, adminId) {
         if (!name || name.trim() === '') {

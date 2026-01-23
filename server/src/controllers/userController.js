@@ -31,29 +31,26 @@ exports.sendFriendRequest = async (req, res) => {
 
         if (userId === myId) return res.status(400).json({ message: "Không thể kết bạn với chính mình" });
 
-        // Kiểm tra người nhận có tồn tại không
         const targetUser = await User.findById(userId);
-        if (!targetUser) {
-            return res.status(404).json({ message: "Người dùng không tồn tại" });
-        }
+        if (!targetUser) return res.status(404).json({ message: "Người dùng không tồn tại" });
 
         const me = await User.findById(myId);
-        if (me.friends.includes(userId)) {
-            return res.status(400).json({ message: "Hai người đã là bạn bè" });
-        }
+        if (me.friends.includes(userId)) return res.status(400).json({ message: "Hai người đã là bạn bè" });
 
-        // Logic thêm vào pendingRequests
+        // 1. Thêm vào pendingRequests
         await User.findByIdAndUpdate(userId, { $addToSet: { pendingRequests: myId } });
 
-        // Socket thông báo (nếu có)
+        // 2. TỰ ĐỘNG TẠO PHÒNG CHAT 1-1 NGAY TẠI ĐÂY
+        // Sử dụng ChatService để tạo hoặc lấy phòng đã có
+        const room = await ChatService.createOrGetPrivateRoom(myId, userId);
+
         const io = req.app.get('socketio');
         if (io) {
-            io.to(userId).emit('new_friend_request', { from: myId });
+            io.to(userId).emit('new_friend_request', { from: myId, roomId: room._id });
         }
 
-        res.status(200).json({ success: true, message: "Đã gửi lời mời!" });
+        res.status(200).json({ success: true, message: "Đã gửi lời mời và tạo phòng chat!", roomId: room._id });
     } catch (error) {
-        console.error("Lỗi gửi kết bạn:", error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -139,6 +136,20 @@ exports.searchUsers = async (req, res) => {
                 }
             ]
         }).select('username fullName phoneNumber avatarUrl isOnline');
+        // Khi người dùng A chấp nhận lời mời của B
+        async function handleAcceptFriend(userAId, userBId) {
+            // 1. Cập nhật trạng thái bạn bè trong DB (code hiện tại của bạn)
+            
+            // 2. Tự động tạo room 1-1
+            const roomName = `private_${userAId}_${userBId}`; // Tên định danh nội bộ
+            const newRoom = await RoomRepository.create({
+                name: roomName,
+                isGroup: false,
+                members: [userAId, userBId]
+            });
+            
+            return newRoom;
+        }
 
         // 3. Gắn thêm trạng thái isFriend cho từng kết quả
         const results = users.map(user => {
