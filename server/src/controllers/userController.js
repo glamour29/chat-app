@@ -1,7 +1,7 @@
-const ChatService = require('../services/ChatService'); // Import Service
-const User = require('../models/User'); // Import Model User để kiểm tra tồn tại
+const User = require('../models/User'); // Import Model User
+const ChatService = require('../services/ChatService'); // Import ChatService
 
-// 1. Lấy danh sách users
+// 1. Lấy danh sách users (trừ bản thân)
 exports.getUsers = async (req, res) => {
     try {
         const users = await ChatService.getAllUsers();
@@ -13,17 +13,79 @@ exports.getUsers = async (req, res) => {
     }
 };
 
-// 2. Cập nhật Profile
+// 2. Cập nhật Profile (ĐÃ SỬA: Gọi trực tiếp DB để trả về đúng định dạng JSON)
 exports.updateProfile = async (req, res) => {
     try {
-        const updatedUser = await ChatService.updateUserProfile(req.user.userId, req.body);
-        res.json(updatedUser);
+        const userId = req.user.userId;
+        const { fullName } = req.body;
+
+        // Validate dữ liệu
+        if (!fullName || fullName.trim().length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Tên hiển thị không được để trống" 
+            });
+        }
+
+        // Cập nhật vào MongoDB
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { fullName: fullName.trim() },
+            { new: true } // Trả về data mới nhất sau khi update
+        ).select('-password'); // Không trả về mật khẩu
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "Người dùng không tồn tại" });
+        }
+
+        // Trả về đúng cấu trúc Android mong đợi (UserResponse)
+        res.json({
+            success: true,
+            message: "Cập nhật tên thành công",
+            data: updatedUser
+        });
+
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Lỗi update profile:", error);
+        res.status(500).json({ success: false, message: "Lỗi server: " + error.message });
     }
 };
 
-// 3. Gửi lời mời kết bạn (Fix lỗi "Không tìm thấy")
+// 3. Upload Avatar
+exports.uploadAvatar = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "Chưa chọn file ảnh" });
+        }
+
+        // Tạo đường dẫn ảnh đầy đủ
+        const protocol = req.protocol;
+        const host = req.get('host');
+        // Lưu ý: Đảm bảo server.js đã có dòng: app.use('/uploads', express.static(...));
+        const avatarUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+        // Cập nhật URL vào Database
+        const userId = req.user.userId;
+        const updatedUser = await User.findByIdAndUpdate(
+            userId, 
+            { avatarUrl: avatarUrl }, 
+            { new: true }
+        ).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: "Upload ảnh thành công",
+            avatarUrl: avatarUrl,
+            user: updatedUser
+        });
+
+    } catch (error) {
+        console.error("Lỗi upload avatar:", error);
+        res.status(500).json({ success: false, message: "Lỗi server khi upload ảnh" });
+    }
+};
+
+// 4. Gửi lời mời kết bạn
 exports.sendFriendRequest = async (req, res) => {
     try {
         const { userId } = req.body; // ID người nhận
@@ -37,31 +99,29 @@ exports.sendFriendRequest = async (req, res) => {
         const me = await User.findById(myId);
         if (me.friends.includes(userId)) return res.status(400).json({ message: "Hai người đã là bạn bè" });
 
-        // 1. Thêm vào pendingRequests
+        // A. Thêm vào pendingRequests
         await User.findByIdAndUpdate(userId, { $addToSet: { pendingRequests: myId } });
 
-        // 2. TỰ ĐỘNG TẠO PHÒNG CHAT 1-1 NGAY TẠI ĐÂY
-        // Sử dụng ChatService để tạo hoặc lấy phòng đã có
+        // B. Tự động tạo/lấy phòng chat 1-1
         const room = await ChatService.createOrGetPrivateRoom(myId, userId);
 
+        // C. Gửi Socket thông báo
         const io = req.app.get('socketio');
         if (io) {
             io.to(userId).emit('new_friend_request', { from: myId, roomId: room._id });
         }
 
-        res.status(200).json({ success: true, message: "Đã gửi lời mời và tạo phòng chat!", roomId: room._id });
+        res.status(200).json({ success: true, message: "Đã gửi lời mời!", roomId: room._id });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// 4. Chấp nhận kết bạn & TẠO ROOM (Fix lỗi không tạo Room)
+// 5. Chấp nhận kết bạn
 exports.acceptFriendRequest = async (req, res) => {
     try {
         const { userId } = req.body; // ID người gửi lời mời
         const myId = req.user.userId;
-
-        console.log(` Chấp nhận kết bạn: ${myId} với ${userId}`);
 
         // A. Cập nhật danh sách bạn bè (2 chiều)
         await User.findByIdAndUpdate(myId, { 
@@ -72,11 +132,8 @@ exports.acceptFriendRequest = async (req, res) => {
             $addToSet: { friends: myId } 
         });
 
-        // B. GỌI SERVICE ĐỂ TẠO HOẶC LẤY ROOM (Đây là chỗ fix lỗi quan trọng)
-        // ChatService đã có hàm createOrGetPrivateRoom chuẩn, ta dùng lại nó
+        // B. Đảm bảo phòng Chat tồn tại
         const room = await ChatService.createOrGetPrivateRoom(myId, userId);
-
-        console.log(` Phòng chat đã sẵn sàng: ${room._id}`);
 
         res.status(200).json({ 
             success: true, 
@@ -84,31 +141,34 @@ exports.acceptFriendRequest = async (req, res) => {
             roomId: room._id 
         });
     } catch (error) {
-        console.error(" Lỗi chấp nhận kết bạn:", error);
+        console.error("Lỗi chấp nhận kết bạn:", error);
         res.status(500).json({ message: error.message });
     }
 };
 
-// 5. Lấy danh sách lời mời
+// 6. Lấy danh sách lời mời kết bạn
 exports.getPendingRequests = async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).populate('pendingRequests', 'username fullName avatarUrl phoneNumber');
+        const user = await User.findById(req.user.userId)
+            .populate('pendingRequests', 'username fullName avatarUrl phoneNumber');
         res.json(user ? user.pendingRequests : []);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-// 6. Lấy danh sách bạn bè
+// 7. Lấy danh sách bạn bè
 exports.getFriends = async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).populate('friends', 'username fullName avatarUrl phoneNumber');
+        const user = await User.findById(req.user.userId)
+            .populate('friends', 'username fullName avatarUrl phoneNumber');
         res.json(user ? user.friends : []);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
+// 8. Tìm kiếm người dùng
 exports.searchUsers = async (req, res) => {
     try {
         const { query } = req.query;
@@ -120,11 +180,11 @@ exports.searchUsers = async (req, res) => {
 
         const searchKey = query.trim();
 
-        // 1. Tìm thông tin của chính mình để lấy danh sách bạn bè
+        // A. Lấy danh sách bạn bè của mình để check trạng thái
         const me = await User.findById(currentUserId).select('friends');
-        const myFriendIds = me.friends.map(id => id.toString());
+        const myFriendIds = me.friends ? me.friends.map(id => id.toString()) : [];
 
-        // 2. Tìm kiếm người dùng theo SĐT hoặc Username
+        // B. Tìm kiếm
         const users = await User.find({
             $and: [
                 { _id: { $ne: currentUserId } },
@@ -136,22 +196,8 @@ exports.searchUsers = async (req, res) => {
                 }
             ]
         }).select('username fullName phoneNumber avatarUrl isOnline');
-        // Khi người dùng A chấp nhận lời mời của B
-        async function handleAcceptFriend(userAId, userBId) {
-            // 1. Cập nhật trạng thái bạn bè trong DB (code hiện tại của bạn)
-            
-            // 2. Tự động tạo room 1-1
-            const roomName = `private_${userAId}_${userBId}`; // Tên định danh nội bộ
-            const newRoom = await RoomRepository.create({
-                name: roomName,
-                isGroup: false,
-                members: [userAId, userBId]
-            });
-            
-            return newRoom;
-        }
 
-        // 3. Gắn thêm trạng thái isFriend cho từng kết quả
+        // C. Gắn thêm trạng thái isFriend
         const results = users.map(user => {
             const userObj = user.toObject();
             userObj.isFriend = myFriendIds.includes(user._id.toString());

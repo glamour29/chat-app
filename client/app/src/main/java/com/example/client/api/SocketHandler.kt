@@ -52,4 +52,9 @@ object SocketHandler {
             mSocket.disconnect()
         }
     }
+
+    fun getSocket(): io.socket.client.Socket? {
+        return mSocket
+    }
+
 }
