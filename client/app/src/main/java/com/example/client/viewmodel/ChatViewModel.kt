@@ -180,7 +180,28 @@ class ChatViewModel(
     fun markRoomAsRead(roomId: String) {
         repository.markRoomAsRead(roomId)
     }
+    // Trong ChatViewModel.kt hoặc khi vẽ UI Compose:
 
+    fun getDisplayRoomName(room: ChatRoom, currentUserId: String): String {
+        if (room.isGroup && room.name.isNotBlank()) return room.name
+
+        // 1. Kiểm tra mảng members có dữ liệu không
+        if (room.members.isEmpty()) return "Cuộc trò chuyện"
+
+        // 2. Tìm đối phương (Partner)
+        // Dùng trim() để loại bỏ khoảng trắng dư thừa nếu có
+        val partner = room.members.find { it.id.trim() != currentUserId.trim() }
+
+        // 3. Xử lý kết quả trả về an toàn
+        return if (partner != null) {
+            val name = partner.fullName.ifBlank { partner.username }
+            if (name.isNotBlank()) name else "Người dùng"
+        } else {
+            // Nếu không tìm thấy ai khác, có thể bạn đang chat với chính mình
+            val me = room.members.find { it.id.trim() == currentUserId.trim() }
+            me?.fullName?.ifBlank { me.username } ?: "Người dùng"
+        }
+    }
     fun onUserInputChanged(text: String) {
         // Logic xử lý khi người dùng đang nhập (typing...) nếu cần
     }

@@ -43,6 +43,7 @@ class UserRepository extends BaseRepository {
             ]
         });
     }
+    
 
     async getUsersExcept(excludeUserId) {
         return await this.findAll(
