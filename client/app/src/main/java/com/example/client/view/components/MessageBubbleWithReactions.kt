@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.client.model.data.Message
-import com.example.client.utils.decodeBase64ToBitmap
+// 👇 Sửa import: Import object ImageUtils
+import com.example.client.utils.ImageUtils
 import com.example.client.view.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -33,7 +34,7 @@ fun MessageBubbleWithReactions(
     isMe: Boolean,
     onSeen: () -> Unit = {},
     onLongPress: () -> Unit = {},
-    onReactionClick: (String) -> Unit = {}  // Giữ param này tạm, sau có thể xóa nếu không dùng
+    onReactionClick: (String) -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
         if (!isMe) onSeen()
@@ -43,7 +44,8 @@ fun MessageBubbleWithReactions(
             message.content.startsWith("data:image")
 
     val imageBitmap = remember(message.content) {
-        if (isImage) decodeBase64ToBitmap(message.content) else null
+        // 👇 Sửa: Gọi thông qua ImageUtils
+        if (isImage) ImageUtils.decodeBase64ToBitmap(message.content) else null
     }
 
     val timeText = remember(message.timestamp, message.createdAt) {

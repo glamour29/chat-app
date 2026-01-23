@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.client.model.data.Message
-import com.example.client.utils.decodeBase64ToBitmap
+// 👇 Đã sửa import: Import cả object ImageUtils
+import com.example.client.utils.ImageUtils
 import com.example.client.view.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,11 +28,9 @@ import java.util.*
 @Composable
 fun MessageBubble(
     message: Message,
-    currentUserId: String, // Thay đổi quan trọng: Truyền ID của user hiện tại vào đây
+    currentUserId: String,
     onSeen: () -> Unit = {}
 ) {
-    // Xác định trực tiếp dựa trên senderId và currentUserId
-    // Việc này giúp tránh lỗi khi Re-login bằng acc khác
     val isMe = remember(message.senderId, currentUserId) {
         message.senderId == currentUserId
     }
@@ -53,7 +52,8 @@ fun MessageBubble(
     val displayText = if (isVoice) "Voice message" else message.content
 
     val imageBitmap = remember(message.content, isImage) {
-        if (isImage) decodeBase64ToBitmap(message.content) else null
+        // 👇 Đã sửa: Gọi thông qua ImageUtils
+        if (isImage) ImageUtils.decodeBase64ToBitmap(message.content) else null
     }
 
     val timeText = remember(message.timestamp) {
@@ -68,11 +68,10 @@ fun MessageBubble(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp, horizontal = 8.dp),
-        // Cố định: Tin nhắn của mình luôn sang phải (End), người khác bên trái (Start)
         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
     ) {
         Row(
-            modifier = Modifier.widthIn(max = 320.dp), // Tăng độ rộng tối đa một chút
+            modifier = Modifier.widthIn(max = 320.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
         ) {
@@ -142,7 +141,7 @@ fun MessageBubble(
                 color = Color.Gray,
                 modifier = Modifier.padding(
                     top = 2.dp,
-                    start = if (isMe) 0.dp else 40.dp, // Tránh đè lên Avatar
+                    start = if (isMe) 0.dp else 40.dp,
                     end = if (isMe) 4.dp else 0.dp
                 )
             )

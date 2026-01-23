@@ -93,7 +93,7 @@ fun UsersScreenImproved(
                         rooms = filteredRooms,
                         users = friends,
                         currentUserId = currentUserId,
-                        viewModel = viewModel, // Truyền viewModel để dùng hàm lấy tên
+                        viewModel = viewModel,
                         onRoomClick = { room, displayName ->
                             viewModel.setActiveRoom(room.id, displayName)
                             onOpenChat(room.id, displayName, room.isGroup, if (room.isGroup) room.memberIds.size else null)
@@ -129,12 +129,26 @@ fun ChatList(
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         items(rooms, key = { it.id }) { room ->
-            // Tính toán tên hiển thị ngay tại đây
-            val displayName = viewModel.getDisplayRoomName(room, currentUserId)
+
+            // --- LOGIC HIỂN THỊ TÊN ĐÃ SỬA ---
+            val displayName = remember(room, users) {
+                if (room.isGroup) {
+                    // Nếu là nhóm -> Lấy tên nhóm
+                    room.name
+                } else {
+                    // Nếu là chat 1-1 -> Tìm ID người kia
+                    val otherUserId = room.memberIds.find { it != currentUserId }
+                    // Tìm thông tin User trong danh sách bạn bè
+                    val otherUser = users.find { it.id == otherUserId }
+                    // Hiển thị FullName, nếu không có thì Username
+                    otherUser?.fullName?.ifBlank { otherUser.username } ?: "Người dùng"
+                }
+            }
+            // ----------------------------------
 
             ChatItem(
                 room = room,
-                displayName = displayName, // Truyền tên đã xử lý vào
+                displayName = displayName,
                 users = users,
                 currentUserId = currentUserId,
                 onClick = { onRoomClick(room, displayName) }
@@ -188,7 +202,7 @@ fun ChatItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = displayName, // Sử dụng displayName thay vì room.name
+                        text = displayName, // Đã nhận tên đúng từ ChatList
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         maxLines = 1,
@@ -212,7 +226,6 @@ fun ChatItem(
                 )
             }
 
-            // Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
             if (room.unreadCount > 0) {
                 Spacer(Modifier.width(8.dp))
                 Surface(
@@ -234,7 +247,6 @@ fun ChatItem(
     }
 }
 
-// Các Component phụ giữ nguyên nhưng đảm bảo import đầy đủ
 @Composable
 private fun ChatItemAvatar(room: ChatRoom, isOnline: Boolean) {
     Box {
